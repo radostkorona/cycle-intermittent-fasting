@@ -20,6 +20,7 @@ const load = (key, fallback) => {
     return fallback;
   }
 };
+
 const exportData = () => {
   const data = {
     regime: load("regime", []),
@@ -67,45 +68,45 @@ export default function App() {
   const [tab, setTab] = useState("regime");
 
   return (
-    <div style={{
-  padding: 20,
-  maxWidth: 420,
-  margin: "auto",
-  fontFamily: "sans-serif",
-  background: "#f9f9f9"
-}}>
+    <div lang="bg" style={{
+      padding: 20,
+      maxWidth: 420,
+      margin: "auto",
+      fontFamily: "sans-serif",
+      background: "#f9f9f9"
+    }}>
       <h2>Cycle Intermittent Fasting</h2>
+
       <div style={{ marginBottom: 10 }}>
+        <button onClick={exportData}>
+          Export
+        </button>
 
-  <button onClick={exportData}>
-    Export
-  </button>
+        <label style={{ marginLeft: 10 }}>
+          Import
+          <input
+            type="file"
+            accept="application/json"
+            onChange={importData}
+            style={{ display: "none" }}
+          />
+        </label>
+      </div>
 
-  <label style={{ marginLeft: 10 }}>
-    Import
-    <input
-      type="file"
-      accept="application/json"
-      onChange={importData}
-      style={{ display: "none" }}
-    />
-  </label>
-
-</div>
       <div style={{ marginBottom: 10 }}>
         {["regime", "weight", "measures", "charts"].map((t) => (
           <button
-  key={t}
-  onClick={() => setTab(t)}
-  style={{
-    marginRight: 5,
-    background: tab === t ? "#ff69b4" : "#e0ffe0",
-    color: "black",
-    border: "none",
-    padding: "6px 10px",
-    borderRadius: 6
-  }}
->
+            key={t}
+            onClick={() => setTab(t)}
+            style={{
+              marginRight: 5,
+              background: tab === t ? "#ff69b4" : "#e0ffe0",
+              color: "black",
+              border: "none",
+              padding: "6px 10px",
+              borderRadius: 6
+            }}
+          >
             {t}
           </button>
         ))}
@@ -131,87 +132,194 @@ const pattern = [
   ...Array(11).fill(13)
 ];
 
+const defaultRows = Array.from({ length: 30 }, (_, i) => ({
+  id: i + 1,
+  date: "",
+  last: "",
+  breakfast: "",
+  fasting: pattern[i],
+  done: false,
+}));
+
 function Regime() {
-  const [rows, setRows] = useState(() =>
-    load("regime", Array.from({ length: 30 }, (_, i) => ({
-      id: i + 1,
-      date: "",
-      breakfast: "",
-      last: "",
-      fasting: pattern[i],
-      done: false
-    })))
+  const [rows, setRows] = React.useState(() =>
+    load("regime", defaultRows)
   );
 
-  useEffect(() => save("regime", rows), [rows]);
+  React.useEffect(() => {
+    save("regime", rows);
+  }, [rows]);
 
-  const setDate = (i, val) => {
-    const newRows = [...rows];
-    const start = new Date(val);
-
-    for (let j = i; j < newRows.length; j++) {
-      const d = new Date(start);
-      d.setDate(d.getDate() + (j - i));
-      newRows[j].date = d.toISOString().slice(0, 10);
-    }
-
-    setRows(newRows);
+  const add = () => {
+    setRows([
+      ...rows,
+      {
+        id: rows.length + 1,
+        date: "",
+        last: "",
+        breakfast: "",
+        fasting: pattern[rows.length] ?? 13,
+        done: false,
+      },
+    ]);
   };
 
-  const setLast = (i, val) => {
-    const newRows = [...rows];
-    newRows[i].last = val;
+  const setDate = (i, value) => {
+    const updated = [...rows];
+    const start = new Date(value);
+    for (let j = i; j < updated.length; j++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + (j - i));
+      updated[j].date = d.toISOString().slice(0, 10);
+    }
+    setRows(updated);
+  };
 
-    if (val && newRows[i + 1]) {
-      const [h, m] = val.split(":");
-      const d = new Date();
-      d.setHours(+h + newRows[i].fasting, +m);
-      newRows[i + 1].breakfast =
-        d.getHours().toString().padStart(2, "0") +
+  const setLast = (i, value) => {
+    const updated = [...rows];
+    updated[i].last = value;
+
+    if (value && updated[i + 1] !== undefined) {
+      const [h, m] = value.split(":").map(Number);
+      const fastingHours = Number(updated[i].fasting) || 15;
+      const total = h * 60 + m + fastingHours * 60;
+
+      const bh = Math.floor(total / 60) % 24;
+      const bm = total % 60;
+
+      updated[i + 1].breakfast =
+        String(bh).padStart(2, "0") +
         ":" +
-        d.getMinutes().toString().padStart(2, "0");
+        String(bm).padStart(2, "0");
     }
 
-    setRows(newRows);
+    setRows(updated);
+  };
+
+  const toggleDone = (i) => {
+    const updated = [...rows];
+    updated[i].done = !updated[i].done;
+    setRows(updated);
+  };
+
+  const startNewCycle = () => {
+    const ok = window.confirm(
+      "Start new cycle? This will reset all data but keep the structure."
+    );
+    if (!ok) return;
+
+    const resetRows = Array.from({ length: rows.length }, (_, i) => ({
+      id: i + 1,
+      date: "",
+      last: "",
+      breakfast: "",
+      fasting: pattern[i] ?? 13,
+      done: false,
+    }));
+
+    setRows(resetRows);
+    save("regime", resetRows);
   };
 
   return (
     <div>
+      {/* Buttons */}
+      <div style={{ marginBottom: 10 }}>
+        <button onClick={add}>Add</button>
+
+        <button
+          onClick={startNewCycle}
+          style={{ marginLeft: 10 }}
+        >
+          🔄 New Cycle
+        </button>
+      </div>
+
+      {/* Header */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "25px 100px 55px 28px 75px 40px",
+          fontWeight: "bold",
+          borderBottom: "1px solid #ccc",
+          paddingBottom: "4px",
+          marginBottom: "6px",
+          fontSize: 13,
+          columnGap: "6px",
+        }}
+      >
+        <div>#</div>
+        <div>Date</div>
+        <div>Breakfast</div>
+        <div>✔</div>
+        <div>Last meal</div>
+        <div>Fast</div>
+      </div>
+
+      {/* Rows */}
       {rows.map((r, i) => (
-  <div key={i} style={{
-    display: "grid",
-    gridTemplateColumns: "30px 120px 60px 120px 80px",
-    alignItems: "center",
-    gap: "6px",
-    marginBottom: "6px"
-  }}>
-          <div>{r.id}</div>
+        <div
+          key={i}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "25px 100px 55px 28px 75px 40px",
+            alignItems: "center",
+            columnGap: "6px",
+            marginBottom: "4px",
+            background: i % 2 ? "#fafafa" : "white",
+          }}
+        >
+          <div style={{ fontSize: 13 }}>{r.id}</div>
 
-          <input
-            type="date"
-            value={r.date}
-            onChange={(e) => setDate(i, e.target.value)}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input
+              type="date"
+              value={r.date}
+              onChange={(e) => setDate(i, e.target.value)}
+              style={{ width: 22, padding: 0, border: "none", background: "transparent", cursor: "pointer", flexShrink: 0 }}
+            />
+            <span style={{ fontSize: 12 }}>
+              {r.date
+                ? (() => {
+                    const [y, m, d] = r.date.split("-");
+                    return `${d}.${m}.${y.slice(2)}`;
+                  })()
+                : "дд.мм.гг"}
+            </span>
+          </div>
 
-          <div>{r.breakfast || "--:--"}</div>
-
-          <input
-            type="time"
-            value={r.last}
-            onChange={(e) => setLast(i, e.target.value)}
-          />
-
-          <div>{r.fasting}h</div>
+          <div style={{ fontSize: 13 }}>{r.breakfast || "--:--"}</div>
 
           <button
-            onClick={() => {
-              const n = [...rows];
-              n[i].done = !n[i].done;
-              setRows(n);
+            onClick={() => toggleDone(i)}
+            style={{
+              width: 22,
+              height: 22,
+              padding: 0,
+              fontSize: 12,
+              border: "1px solid #ccc",
+              borderRadius: 4,
+              background: r.done ? "#ff69b4" : "white",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             {r.done ? "✔" : ""}
           </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <input
+              type="time"
+              value={r.last}
+              onChange={(e) => setLast(i, e.target.value)}
+              style={{ width: 22, padding: 0, border: "none", background: "transparent", cursor: "pointer", flexShrink: 0 }}
+            />
+            <span style={{ fontSize: 13 }}>{r.last || "--:--"}</span>
+          </div>
+
+          <div style={{ fontSize: 13 }}>{r.fasting}h</div>
         </div>
       ))}
     </div>
@@ -257,35 +365,35 @@ function Weight() {
       <button onClick={add}>Add</button>
 
       {data.map((d, i) => (
-  <div key={i} style={{ marginBottom: 5 }}>
-    {d.date} - {d.weight}
+        <div key={i} style={{ marginBottom: 5 }}>
+          {d.date} - {d.weight}
 
-    <button onClick={() => {
-      const newVal = prompt("Edit weight:", d.weight);
-      if (!newVal) return;
+          <button onClick={() => {
+            const newVal = prompt("Edit weight:", d.weight);
+            if (!newVal) return;
 
-      const updated = [...data];
-      updated[i].weight = newVal;
+            const updated = [...data];
+            updated[i].weight = newVal;
 
-      setData(updated);
-      save("weight", updated);
-    }}>
-      ✏️
-    </button>
+            setData(updated);
+            save("weight", updated);
+          }}>
+            ✏️
+          </button>
 
-    <button onClick={() => {
-      const updated = data.filter((_, idx) => idx !== i);
-      setData(updated);
-      save("weight", updated);
-    }}>
-      ❌
-    </button>
-  </div>
-  ))}
- </div>
-);
+          <button onClick={() => {
+            const updated = data.filter((_, idx) => idx !== i);
+            setData(updated);
+            save("weight", updated);
+          }}>
+            ❌
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }
-	  	  
+
 
 /* ---------------- MEASURES ---------------- */
 function Measures() {
@@ -344,13 +452,13 @@ function Measures() {
         onChange={(e) => setForm({ ...form, date: e.target.value })}
       />
 
-      <input placeholder="Bust" value={form.bust} onChange={(e)=>setForm({...form,bust:e.target.value})}/>
-      <input placeholder="Under bust" value={form.under} onChange={(e)=>setForm({...form,under:e.target.value})}/>
-      <input placeholder="Waist" value={form.waist} onChange={(e)=>setForm({...form,waist:e.target.value})}/>
-      <input placeholder="Hips" value={form.hips} onChange={(e)=>setForm({...form,hips:e.target.value})}/>
-      <input placeholder="Thigh" value={form.thigh} onChange={(e)=>setForm({...form,thigh:e.target.value})}/>
-      <input placeholder="Calf" value={form.calf} onChange={(e)=>setForm({...form,calf:e.target.value})}/>
-      <input placeholder="Ankle" value={form.ankle} onChange={(e)=>setForm({...form,ankle:e.target.value})}/>
+      <input placeholder="Bust" value={form.bust} onChange={(e) => setForm({ ...form, bust: e.target.value })} />
+      <input placeholder="Under bust" value={form.under} onChange={(e) => setForm({ ...form, under: e.target.value })} />
+      <input placeholder="Waist" value={form.waist} onChange={(e) => setForm({ ...form, waist: e.target.value })} />
+      <input placeholder="Hips" value={form.hips} onChange={(e) => setForm({ ...form, hips: e.target.value })} />
+      <input placeholder="Thigh" value={form.thigh} onChange={(e) => setForm({ ...form, thigh: e.target.value })} />
+      <input placeholder="Calf" value={form.calf} onChange={(e) => setForm({ ...form, calf: e.target.value })} />
+      <input placeholder="Ankle" value={form.ankle} onChange={(e) => setForm({ ...form, ankle: e.target.value })} />
 
       <button onClick={saveEntry}>Save</button>
 
@@ -371,13 +479,13 @@ function Measures() {
 
               {isEditing ? (
                 <>
-                  <input value={editForm.bust ?? ""} onChange={e=>setEditForm({...editForm,bust:e.target.value})} placeholder="Bust"/>
-                  <input value={editForm.under ?? ""} onChange={e=>setEditForm({...editForm,under:e.target.value})} placeholder="Under"/>
-                  <input value={editForm.waist ?? ""} onChange={e=>setEditForm({...editForm,waist:e.target.value})} placeholder="Waist"/>
-                  <input value={editForm.hips ?? ""} onChange={e=>setEditForm({...editForm,hips:e.target.value})} placeholder="Hips"/>
-                  <input value={editForm.thigh ?? ""} onChange={e=>setEditForm({...editForm,thigh:e.target.value})} placeholder="Thigh"/>
-                  <input value={editForm.calf ?? ""} onChange={e=>setEditForm({...editForm,calf:e.target.value})} placeholder="Calf"/>
-                  <input value={editForm.ankle ?? ""} onChange={e=>setEditForm({...editForm,ankle:e.target.value})} placeholder="Ankle"/>
+                  <input value={editForm.bust ?? ""} onChange={e => setEditForm({ ...editForm, bust: e.target.value })} placeholder="Bust" />
+                  <input value={editForm.under ?? ""} onChange={e => setEditForm({ ...editForm, under: e.target.value })} placeholder="Under" />
+                  <input value={editForm.waist ?? ""} onChange={e => setEditForm({ ...editForm, waist: e.target.value })} placeholder="Waist" />
+                  <input value={editForm.hips ?? ""} onChange={e => setEditForm({ ...editForm, hips: e.target.value })} placeholder="Hips" />
+                  <input value={editForm.thigh ?? ""} onChange={e => setEditForm({ ...editForm, thigh: e.target.value })} placeholder="Thigh" />
+                  <input value={editForm.calf ?? ""} onChange={e => setEditForm({ ...editForm, calf: e.target.value })} placeholder="Calf" />
+                  <input value={editForm.ankle ?? ""} onChange={e => setEditForm({ ...editForm, ankle: e.target.value })} placeholder="Ankle" />
 
                   <button onClick={() => {
                     const updated = [...data];
@@ -439,17 +547,17 @@ function Measures() {
     </div>
   );
 }
-	
+
 
 /* ---------------- CHARTS ---------------- */
 function Charts() {
   const [range, setRange] = useState("3m");
   const weightData = load("weight", [])
-  .map(d => ({
-    date: d.date,
-    value: Number(d.weight?.replace(",", "."))
-  }))
-  .filter(d => !isNaN(d.value));
+    .map(d => ({
+      date: d.date,
+      value: Number(d.weight?.replace(",", "."))
+    }))
+    .filter(d => !isNaN(d.value));
   const measures = load("measures", []);
 
   const clean = (v) => {
@@ -537,36 +645,37 @@ function Charts() {
           </button>
         ))}
       </div>
-	  {weightData.length > 0 && (
-  <div style={{ marginBottom: 30 }}>
-    <h4>Weight</h4>
 
-    <ResponsiveContainer width="100%" height={200}>
-      <LineChart data={weightData}>
-        <XAxis dataKey="date" />
-        <YAxis />
-        <YAxis orientation="right" />
-        <Tooltip />
+      {weightData.length > 0 && (
+        <div style={{ marginBottom: 30 }}>
+          <h4>Weight</h4>
 
-        <Line
-          type="monotone"
-          dataKey="value"
-          stroke="green"
-          strokeWidth={2}
-          dot
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  </div>
-)}
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={weightData}>
+              <XAxis dataKey="date" />
+              <YAxis />
+              <YAxis orientation="right" />
+              <Tooltip />
+
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="green"
+                strokeWidth={2}
+                dot
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {buildChart("bust")}
       {buildChart("under")}
       {buildChart("waist")}
-	  {buildChart("thigh")}
       {buildChart("hips")}
-	  {buildChart("calf")}
-	  {buildChart("ankle")}
+      {buildChart("thigh")}
+      {buildChart("calf")}
+      {buildChart("ankle")}
     </div>
   );
 }
