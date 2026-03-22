@@ -94,7 +94,7 @@ export default function App() {
       </div>
 
       <div style={{ marginBottom: 10 }}>
-        {["regime", "weight", "measures", "charts"].map((t) => (
+        {["regime", "weight", "measures", "charts", "help"].map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -116,6 +116,7 @@ export default function App() {
       {tab === "weight" && <Weight />}
       {tab === "measures" && <Measures />}
       {tab === "charts" && <Charts />}
+      {tab === "help" && <Help />}
     </div>
   );
 }
@@ -239,7 +240,7 @@ function Regime() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "25px 100px 55px 28px 75px 40px",
+          gridTemplateColumns: "25px 100px 30px 55px 28px 75px 28px",
           fontWeight: "bold",
           borderBottom: "1px solid #ccc",
           paddingBottom: "4px",
@@ -250,19 +251,24 @@ function Regime() {
       >
         <div>#</div>
         <div>Date</div>
+        <div>Day</div>
         <div>Breakfast</div>
         <div>✔</div>
         <div>Last meal</div>
-        <div>Fast</div>
+        <div>F</div>
       </div>
 
       {/* Rows */}
-      {rows.map((r, i) => (
+      {rows.map((r, i) => {
+        const dayAbbr = r.date
+          ? ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(r.date).getDay()]
+          : "";
+        return (
         <div
           key={i}
           style={{
             display: "grid",
-            gridTemplateColumns: "25px 100px 55px 28px 75px 40px",
+            gridTemplateColumns: "25px 100px 30px 55px 28px 75px 28px",
             alignItems: "center",
             columnGap: "6px",
             marginBottom: "4px",
@@ -287,6 +293,8 @@ function Regime() {
                 : "дд.мм.гг"}
             </span>
           </div>
+
+          <div style={{ fontSize: 12, color: "#555" }}>{dayAbbr}</div>
 
           <div style={{ fontSize: 13 }}>{r.breakfast || "--:--"}</div>
 
@@ -319,9 +327,10 @@ function Regime() {
             <span style={{ fontSize: 13 }}>{r.last || "--:--"}</span>
           </div>
 
-          <div style={{ fontSize: 13 }}>{r.fasting}h</div>
+          <div style={{ fontSize: 12 }}>{r.fasting}h</div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -676,6 +685,55 @@ function Charts() {
       {buildChart("thigh")}
       {buildChart("calf")}
       {buildChart("ankle")}
+    </div>
+  );
+}
+
+/* ---------------- HELP ---------------- */
+function Help() {
+  const h = (text) => (
+    <h4 style={{ marginTop: 18, marginBottom: 4, color: "#c0396b" }}>{text}</h4>
+  );
+  const p = (text) => (
+    <p style={{ margin: "4px 0", fontSize: 13, lineHeight: 1.5 }}>{text}</p>
+  );
+
+  return (
+    <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+
+      {h("📋 Regime tab")}
+      {p("This is the main fasting schedule. It contains 30 rows — one for each day of your cycle.")}
+      {p("• Date — click the calendar icon to pick a date. If you set a date in any row, all following rows will be automatically filled with consecutive dates.")}
+      {p("• Day — shows the day of the week (Mon, Tue, etc.) automatically once the date is set.")}
+      {p("• Breakfast — filled in automatically based on the previous day's Last meal time and fasting duration.")}
+      {p("• ✔ — click to mark that you successfully kept the fasting hours. The button turns pink.")}
+      {p("• Last meal — click the clock icon to enter the time of your last food intake for that day. Once filled, the next row's Breakfast time is calculated automatically.")}
+      {p("• F — shows the fasting window in hours for that day, according to Mindy Pelz's 30-day plan (15h, 17h, 24h, or 13h).")}
+
+      {h("🔄 New Cycle button")}
+      {p("Clears all dates, times and checkmarks from the Regime table, but keeps the 30 rows and the fasting pattern. Use this at the start of each new cycle. If you have period you should start a new cycle when your period starts.")}
+
+      {h("➕ Add button")}
+      {p("Adds an extra row at the bottom of the Regime table if you need more than 30 days.")}
+
+      {h("⚖️ Weight tab")}
+      {p("Record your weight over time. Pick a date, enter your weight in kg (use a comma for decimals, e.g. 63,5), and click Add.")}
+      {p("Each entry can be edited (✏️) or deleted (❌). Weight progress is shown in the Charts tab.")}
+
+      {h("📏 Measures tab")}
+      {p("Record your body measurements in centimetres: Bust, Under bust, Waist, Hips, Thigh, Calf, Ankle.")}
+      {p("Pick a date, fill in the fields you want, and click Save. You don't need to fill all fields — leave any empty that you don't want to track.")}
+      {p("Each entry can be edited or deleted. All measurements are shown as separate charts in the Charts tab.")}
+
+      {h("📈 Charts tab")}
+      {p("Shows line charts for Weight and all body measurements over time.")}
+      {p("Use the 1M / 3M / 6M / 1Y buttons to filter the time range displayed.")}
+
+      {h("💾 Export / Import")}
+      {p("Export — saves all your data (regime, weight, measures) as a JSON backup file to your device.")}
+      {p("Import — loads a previously exported backup file and restores all data. The page will reload after import.")}
+      {p("Use Export regularly to avoid losing your data if the browser cache is cleared.")}
+
     </div>
   );
 }
