@@ -13,23 +13,35 @@ import {
   doc, getDoc, setDoc
 } from "firebase/firestore";
 
-/* ---------------- FIRESTORE STORAGE ---------------- */
+/* ---------------- STORAGE ---------------- */
+// Guest mode: localStorage. Logged in: Firestore.
+const localSave = (key, value) =>
+  localStorage.setItem(key, JSON.stringify(value));
+
+const localLoad = (key, fallback) => {
+  try {
+    const data = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(data) ? data : (data !== null && data !== undefined ? data : fallback);
+  } catch { return fallback; }
+};
+
 const saveToCloud = async (uid, key, value) => {
   try {
     await setDoc(doc(db, "users", uid), { [key]: value }, { merge: true });
-  } catch (e) {
-    console.error("Save error:", e);
-  }
+  } catch (e) { console.error("Save error:", e); }
 };
 
 const loadFromCloud = async (uid) => {
   try {
     const snap = await getDoc(doc(db, "users", uid));
     return snap.exists() ? snap.data() : {};
-  } catch (e) {
-    console.error("Load error:", e);
-    return {};
-  }
+  } catch (e) { console.error("Load error:", e); return {}; }
+};
+
+// Universal save/load used by all components
+const save = (key, value, uid) => {
+  localSave(key, value);
+  if (uid) saveToCloud(uid, key, value);
 };
 
 /* ---------------- PATTERN ---------------- */
@@ -52,8 +64,8 @@ const defaultRows = Array.from({ length: 30 }, (_, i) => ({
   done: false,
 }));
 
-/* ---------------- LOGIN SCREEN ---------------- */
-function LoginScreen() {
+/* ---------------- LOGIN MODAL ---------------- */
+function LoginModal({ onClose }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,6 +81,7 @@ function LoginScreen() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
+      onClose();
     } catch (e) {
       setError(e.message.replace("Firebase: ", "").replace(/\(auth.*\)\.?/, ""));
     }
@@ -77,67 +90,50 @@ function LoginScreen() {
 
   return (
     <div style={{
-      maxWidth: 340,
-      margin: "80px auto",
-      padding: 30,
-      background: "white",
-      borderRadius: 12,
-      boxShadow: "0 2px 16px rgba(0,0,0,0.1)",
-      fontFamily: "sans-serif"
+      position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+      background: "rgba(0,0,0,0.4)", zIndex: 1000,
+      display: "flex", alignItems: "center", justifyContent: "center"
     }}>
-      <h2 style={{ textAlign: "center", marginBottom: 24, color: "#c0396b" }}>
-        🌸 Cycle Intermittent Fasting
-      </h2>
+      <div style={{
+        background: "white", borderRadius: 12, padding: 28,
+        width: 300, boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
+        fontFamily: "sans-serif"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h3 style={{ margin: 0, color: "#c0396b" }}>
+            {mode === "login" ? "Log in" : "Register"}
+          </h3>
+          <span onClick={onClose} style={{ cursor: "pointer", fontSize: 20, color: "#aaa" }}>✕</span>
+        </div>
 
-      <div style={{ marginBottom: 16 }}>
         <input
-          type="email"
-          placeholder="Email"
-          value={email}
+          type="email" placeholder="Email" value={email}
           onChange={e => setEmail(e.target.value)}
-          style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }}
+          style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box", marginBottom: 12 }}
         />
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
         <input
-          type="password"
-          placeholder="Password"
-          value={password}
+          type="password" placeholder="Password" value={password}
           onChange={e => setPassword(e.target.value)}
           onKeyDown={e => e.key === "Enter" && handle()}
-          style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box" }}
+          style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #ccc", boxSizing: "border-box", marginBottom: 12 }}
         />
-      </div>
 
-      {error && (
-        <div style={{ color: "red", fontSize: 12, marginBottom: 12 }}>{error}</div>
-      )}
+        {error && <div style={{ color: "red", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 
-      <button
-        onClick={handle}
-        disabled={loading}
-        style={{
-          width: "100%",
-          padding: "10px",
-          background: "#c0396b",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          cursor: "pointer",
-          fontSize: 15,
-          marginBottom: 12
-        }}
-      >
-        {loading ? "..." : mode === "login" ? "Log in" : "Register"}
-      </button>
+        <button onClick={handle} disabled={loading} style={{
+          width: "100%", padding: 10, background: "#c0396b", color: "white",
+          border: "none", borderRadius: 6, cursor: "pointer", fontSize: 15, marginBottom: 12
+        }}>
+          {loading ? "..." : mode === "login" ? "Log in" : "Register"}
+        </button>
 
-      <div style={{ textAlign: "center", fontSize: 13 }}>
-        {mode === "login" ? (
-          <>No account? <span style={{ color: "#c0396b", cursor: "pointer" }} onClick={() => setMode("register")}>Register</span></>
-        ) : (
-          <>Already have an account? <span style={{ color: "#c0396b", cursor: "pointer" }} onClick={() => setMode("login")}>Log in</span></>
-        )}
+        <div style={{ textAlign: "center", fontSize: 13 }}>
+          {mode === "login" ? (
+            <>No account? <span style={{ color: "#c0396b", cursor: "pointer" }} onClick={() => setMode("register")}>Register</span></>
+          ) : (
+            <>Have an account? <span style={{ color: "#c0396b", cursor: "pointer" }} onClick={() => setMode("login")}>Log in</span></>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -146,45 +142,33 @@ function LoginScreen() {
 /* ---------------- APP ---------------- */
 export default function App() {
   const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [showLogin, setShowLogin] = useState(false);
   const [tab, setTab] = useState("regime");
-  const [userData, setUserData] = useState(null);
+  const [cloudData, setCloudData] = useState(null);
 
-  // Listen for auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
         const data = await loadFromCloud(u.uid);
-        setUserData(data);
+        setCloudData(data);
+      } else {
+        setCloudData(null);
       }
-      setAuthLoading(false);
     });
     return unsub;
   }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
-    setUserData(null);
+    setCloudData(null);
   };
 
-  if (authLoading) {
-    return (
-      <div style={{ textAlign: "center", marginTop: 80, fontFamily: "sans-serif", color: "#999" }}>
-        Loading...
-      </div>
-    );
-  }
-
-  if (!user) return <LoginScreen />;
-
-  if (!userData) {
-    return (
-      <div style={{ textAlign: "center", marginTop: 80, fontFamily: "sans-serif", color: "#999" }}>
-        Loading your data...
-      </div>
-    );
-  }
+  // Data source: cloud if logged in, localStorage if guest
+  const uid = user ? user.uid : null;
+  const regimeData = cloudData ? (cloudData.regime || defaultRows) : localLoad("regime", defaultRows);
+  const weightData = cloudData ? (cloudData.weight || []) : localLoad("weight", []);
+  const measuresData = cloudData ? (cloudData.measures || []) : localLoad("measures", []);
 
   return (
     <div lang="bg" style={{
@@ -195,16 +179,22 @@ export default function App() {
       background: "#f9f9f9",
       minHeight: "100vh"
     }}>
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <h2 style={{ margin: 0, fontSize: 18, color: "#c0396b" }}>Cycle Intermittent Fasting</h2>
         <div style={{ fontSize: 12, color: "#888", textAlign: "right" }}>
-          <div>{user.email}</div>
-          <span
-            onClick={handleLogout}
-            style={{ color: "#c0396b", cursor: "pointer" }}
-          >
-            Log out
-          </span>
+          {user ? (
+            <>
+              <div>{user.email}</div>
+              <span onClick={handleLogout} style={{ color: "#c0396b", cursor: "pointer" }}>Log out</span>
+            </>
+          ) : (
+            <span onClick={() => setShowLogin(true)} style={{
+              color: "white", background: "#c0396b", padding: "4px 10px",
+              borderRadius: 6, cursor: "pointer", fontSize: 12
+            }}>Log in</span>
+          )}
         </div>
       </div>
 
@@ -229,10 +219,10 @@ export default function App() {
         ))}
       </div>
 
-      {tab === "regime" && <Regime uid={user.uid} initial={userData.regime || defaultRows} />}
-      {tab === "weight" && <Weight uid={user.uid} initial={userData.weight || []} />}
-      {tab === "measures" && <Measures uid={user.uid} initial={userData.measures || []} />}
-      {tab === "charts" && <Charts uid={user.uid} weight={userData.weight || []} measures={userData.measures || []} />}
+      {tab === "regime" && <Regime uid={uid} initial={regimeData} />}
+      {tab === "weight" && <Weight uid={uid} initial={weightData} />}
+      {tab === "measures" && <Measures uid={uid} initial={measuresData} />}
+      {tab === "charts" && <Charts weight={weightData} measures={measuresData} />}
       {tab === "help" && <Help />}
     </div>
   );
@@ -244,7 +234,7 @@ function Regime({ uid, initial }) {
 
   const persist = (updated) => {
     setRows(updated);
-    saveToCloud(uid, "regime", updated);
+    save("regime", updated, uid);
   };
 
   const add = () => {
@@ -308,7 +298,7 @@ function Regime({ uid, initial }) {
       {/* Header */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "25px 100px 30px 55px 28px 75px 28px",
+        gridTemplateColumns: "20px 110px 32px 52px 26px 80px 26px",
         fontWeight: "bold",
         borderBottom: "1px solid #ccc",
         paddingBottom: "4px",
@@ -333,7 +323,7 @@ function Regime({ uid, initial }) {
         return (
           <div key={i} style={{
             display: "grid",
-            gridTemplateColumns: "25px 100px 30px 55px 28px 75px 28px",
+            gridTemplateColumns: "20px 110px 32px 52px 26px 80px 26px",
             alignItems: "center",
             columnGap: "6px",
             marginBottom: "4px",
@@ -341,19 +331,26 @@ function Regime({ uid, initial }) {
           }}>
             <div style={{ fontSize: 13 }}>{r.id}</div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <input
-                type="date"
-                value={r.date}
-                onChange={(e) => setDate(i, e.target.value)}
-                style={{ width: 22, padding: 0, border: "none", background: "transparent", cursor: "pointer", flexShrink: 0 }}
-              />
+            <div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 4 }}>
               <span style={{ fontSize: 12 }}>
                 {r.date ? (() => {
                   const [y, m, d] = r.date.split("-");
                   return `${d}.${m}.${y.slice(2)}`;
                 })() : "дд.мм.гг"}
               </span>
+              <div style={{ position: "relative", width: 20, height: 20, flexShrink: 0 }}>
+                <span style={{ fontSize: 14, pointerEvents: "none" }}>📅</span>
+                <input
+                  type="date"
+                  value={r.date}
+                  onChange={(e) => setDate(i, e.target.value)}
+                  style={{
+                    position: "absolute", top: 0, left: 0,
+                    width: "100%", height: "100%",
+                    opacity: 0, cursor: "pointer",
+                  }}
+                />
+              </div>
             </div>
 
             <div style={{ fontSize: 12, color: "#555" }}>{dayAbbr}</div>
@@ -372,14 +369,21 @@ function Regime({ uid, initial }) {
               {r.done ? "✔" : ""}
             </button>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <input
-                type="time"
-                value={r.last}
-                onChange={(e) => setLast(i, e.target.value)}
-                style={{ width: 22, padding: 0, border: "none", background: "transparent", cursor: "pointer", flexShrink: 0 }}
-              />
-              <span style={{ fontSize: 13 }}>{r.last || "--:--"}</span>
+            <div style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 12 }}>{r.last || "--:--"}</span>
+              <div style={{ position: "relative", width: 20, height: 20, flexShrink: 0 }}>
+                <span style={{ fontSize: 14, pointerEvents: "none" }}>🕐</span>
+                <input
+                  type="time"
+                  value={r.last}
+                  onChange={(e) => setLast(i, e.target.value)}
+                  style={{
+                    position: "absolute", top: 0, left: 0,
+                    width: "100%", height: "100%",
+                    opacity: 0, cursor: "pointer",
+                  }}
+                />
+              </div>
             </div>
 
             <div style={{ fontSize: 12 }}>{r.fasting}h</div>
@@ -397,7 +401,7 @@ function Weight({ uid, initial }) {
 
   const persist = (updated) => {
     setData(updated);
-    saveToCloud(uid, "weight", updated);
+    save("weight", updated, uid);
   };
 
   const add = () => {
@@ -445,7 +449,7 @@ function Measures({ uid, initial }) {
 
   const persist = (updated) => {
     setData(updated);
-    saveToCloud(uid, "measures", updated);
+    save("measures", updated, uid);
   };
 
   const saveEntry = () => {
