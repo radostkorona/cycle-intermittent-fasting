@@ -310,7 +310,7 @@ function Regime({ uid, initial }) {
         <div>Date</div>
         <div>Day</div>
         <div>Breakfast</div>
-        <div>✔</div>
+        <div style={{ paddingLeft: 6 }}>✔</div>
         <div>Last meal</div>
         <div>F</div>
       </div>
