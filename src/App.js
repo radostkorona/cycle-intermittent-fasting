@@ -18,13 +18,6 @@ import {
 const localSave = (key, value) =>
   localStorage.setItem(key, JSON.stringify(value));
 
-const localLoad = (key, fallback) => {
-  try {
-    const data = JSON.parse(localStorage.getItem(key));
-    return Array.isArray(data) ? data : (data !== null && data !== undefined ? data : fallback);
-  } catch { return fallback; }
-};
-
 const saveToCloud = async (uid, key, value) => {
   try {
     await setDoc(doc(db, "users", uid), { [key]: value }, { merge: true });
