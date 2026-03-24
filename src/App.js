@@ -40,8 +40,11 @@ const loadFromCloud = async (uid) => {
 
 // Universal save/load used by all components
 const save = (key, value, uid) => {
-  localSave(key, value);
-  if (uid) saveToCloud(uid, key, value);
+  if (uid) {
+    saveToCloud(uid, key, value);
+  } else {
+    localSave(key, value);
+  }
 };
 
 /* ---------------- PATTERN ---------------- */
@@ -141,19 +144,23 @@ function LoginModal({ onClose }) {
 
 /* ---------------- APP ---------------- */
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(undefined); // undefined = loading
   const [showLogin, setShowLogin] = useState(false);
   const [tab, setTab] = useState("regime");
   const [cloudData, setCloudData] = useState(null);
+  const [cloudLoading, setCloudLoading] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
+        setCloudLoading(true);
         const data = await loadFromCloud(u.uid);
         setCloudData(data);
+        setCloudLoading(false);
       } else {
         setCloudData(null);
+        setCloudLoading(false);
       }
     });
     return unsub;
@@ -162,13 +169,26 @@ export default function App() {
   const handleLogout = async () => {
     await signOut(auth);
     setCloudData(null);
+    setUser(null);
   };
 
-  // Data source: cloud if logged in, localStorage if guest
+  // Still checking auth state
+  if (user === undefined || cloudLoading) {
+    return (
+      <div style={{ textAlign: "center", marginTop: 80, fontFamily: "sans-serif", color: "#999" }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // Data source: cloud if logged in, empty if guest
   const uid = user ? user.uid : null;
-  const regimeData = cloudData ? (cloudData.regime || defaultRows) : localLoad("regime", defaultRows);
-  const weightData = cloudData ? (cloudData.weight || []) : localLoad("weight", []);
-  const measuresData = cloudData ? (cloudData.measures || []) : localLoad("measures", []);
+  const regimeData = user ? (cloudData?.regime || defaultRows) : defaultRows;
+  const weightData = user ? (cloudData?.weight || []) : [];
+  const measuresData = user ? (cloudData?.measures || []) : [];
+
+  // Key forces full remount of components when user changes
+  const dataKey = user ? user.uid : "guest";
 
   return (
     <div lang="bg" style={{
@@ -219,10 +239,10 @@ export default function App() {
         ))}
       </div>
 
-      {tab === "regime" && <Regime uid={uid} initial={regimeData} />}
-      {tab === "weight" && <Weight uid={uid} initial={weightData} />}
-      {tab === "measures" && <Measures uid={uid} initial={measuresData} />}
-      {tab === "charts" && <Charts weight={weightData} measures={measuresData} />}
+      {tab === "regime" && <Regime key={dataKey} uid={uid} initial={regimeData} />}
+      {tab === "weight" && <Weight key={dataKey} uid={uid} initial={weightData} />}
+      {tab === "measures" && <Measures key={dataKey} uid={uid} initial={measuresData} />}
+      {tab === "charts" && <Charts key={dataKey} weight={weightData} measures={measuresData} />}
       {tab === "help" && <Help />}
     </div>
   );
