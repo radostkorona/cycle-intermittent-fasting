@@ -534,10 +534,6 @@ function Measures({ uid, initial }) {
 function Charts({ weight, measures }) {
   const [range, setRange] = useState("3m");
 
-  const weightData = weight
-    .map(d => ({ date: d.date, value: Number(d.weight?.replace(",", ".")) }))
-    .filter(d => !isNaN(d.value));
-
   const clean = (v) => {
     if (!v) return undefined;
     const num = Number(v.toString().replace(",", "."));
@@ -554,6 +550,13 @@ function Charts({ weight, measures }) {
   };
 
   const startDate = getStartDate();
+
+  const weightData = weight
+    .map(d => ({ date: d.date, value: Number(d.weight?.replace(",", ".")) }))
+    .filter(d => !isNaN(d.value) && d.date)
+    .filter(d => new Date(d.date) >= startDate)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
   const filtered = measures
     .filter(m => new Date(m.date) >= startDate)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -595,20 +598,26 @@ function Charts({ weight, measures }) {
         ))}
       </div>
 
-      {weightData.length > 0 && (
-        <div style={{ marginBottom: 30 }}>
-          <h4>Weight</h4>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={weightData}>
-              <XAxis dataKey="date" />
-              <YAxis />
-              <YAxis orientation="right" />
-              <Tooltip />
-              <Line type="monotone" dataKey="value" stroke="green" strokeWidth={2} dot />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      {weightData.length > 0 && (() => {
+        const wValues = weightData.map(d => d.value);
+        const wMin = Math.min(...wValues);
+        const wMax = Math.max(...wValues);
+        const wPad = (wMax - wMin) * 0.2 || 1;
+        return (
+          <div style={{ marginBottom: 30 }}>
+            <h4>Weight</h4>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={weightData}>
+                <XAxis dataKey="date" />
+                <YAxis domain={[wMin - wPad, wMax + wPad]} />
+                <YAxis orientation="right" domain={[wMin - wPad, wMax + wPad]} />
+                <Tooltip />
+                <Line type="monotone" dataKey="value" stroke="green" strokeWidth={2} dot />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      })()}
 
       {buildChart("bust")}
       {buildChart("under")}
