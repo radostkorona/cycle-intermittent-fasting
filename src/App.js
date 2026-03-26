@@ -672,6 +672,7 @@ function Help() {
       {h("👤 Account")}
       {p("Your data is saved to the cloud and synced across all your devices. Log out and log back in on any device to access your data.")}
       {p("Your email is shown in the top right corner. Click 'Log out' to sign out.")}
+      {p("App built by Rositsa D. Petrova, 2026. Version 1.0")}
     </div>
   );
 }
